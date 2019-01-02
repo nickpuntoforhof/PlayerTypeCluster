@@ -4,7 +4,12 @@ library(Lahman)
 library(dplyr)
 library(ggplot2)
 library(NbClust)
+library(DMwR)
 
+################################################################################
+### Set Working Directory ######################################################
+
+setwd("~/GithubRepositories/PlayerTypeCluster")
 
 ################################################################################
 
@@ -21,8 +26,10 @@ summary <- Batting %>% group_by(yearID) %>%
             IBB_na_pc = sum(is.na(IBB))/n())
 
 ### load in Batting and Master from Lahman package
-data(Batting)
-data(Master)
+#data(Batting)
+Batting <- read.csv("batting.csv", stringsAsFactors = FALSE)
+#data(Master)
+Master <- read.csv("master.csv", stringsAsFactors = FALSE)
 
 ### get columns of master needed for the analysis
 master <- Master[c(1,14,15)]
@@ -58,18 +65,22 @@ batting <- batting %>% mutate(PA = AB + BB + HBP + SH + SF + GIDP,
                               ### to players who never walked in a season, avoiding NAs in the
                               ### calculation of some rate statistics.
                               AVG = H/AB,
-                              SLG = (X1B + 2*X2B + 3*X3B + 4*HR)/AB,
                               OBP = (H + BB + HBP) / (AB + BB + HBP + SF),
-                              OPS = AVG + SLG,
-                              SB_PCT = ifelse((SB + CS) > 0 ,SB / (SB + CS), 0),
-                              SB_FREQ = SB / (H + BB + HBP),
-                              SO_PCT = SO/PA,
-                              HR_PCT = HR/PA,
-                              HR_H = HR/H,
-                              RBI_H = RBI/H,
-                              SO_BB = SO/BB,
+                              SLG = (X1B + 2*X2B + 3*X3B + 4*HR)/AB,
+                              OPS = OBP + SLG,
+                              IS0 = SLG - AVG,
                               X2B_PCT = X2B/PA,
                               X3B_PCT = X3B/PA,
+                              HR_PCT = HR/PA,
+                              HR_H = HR/H,
+                              RBI_PCT = RBI/PA,
+                              RBI_H = RBI/H,
+                              R_PA = R/PA,
+                              R_OB = R / (H + BB + HBP),
+                              SO_BB = SO/BB,
+                              SO_PCT = SO/PA,
+                              SB_PCT = ifelse((SB + CS) > 0 ,SB / (SB + CS), 0),
+                              SB_FREQ = SB / (H + BB + HBP),
                               SH_PCT = SH/PA,
                               SF_PCT = SF/PA,
                               GIDP_PCT = GIDP/PA)
@@ -84,14 +95,15 @@ batting$name <- paste(batting$nameFirst, batting$nameLast, sep = " ")
 
 ### selecting only rate statistics, standardize the data.  This
 ### puts each variable on the same scale, helping the k-means algorithm.
-batting_std <- scale(batting[25:40])
+batting_std <- scale(batting[25:44])
 
 ### plot the within sum of squares for possible clusterings from k=2 to k=50
 wss <- (nrow(batting_std)-1)*sum(apply(batting_std,2,var))
 for (i in 2:50) wss[i] <- sum(kmeans(batting_std, 
-                                     centers = i, iter.max = 20)$withinss)
+                                     centers = i, iter.max = 30)$withinss)
 plot(1:50, wss, type="b", xlab="Number of Clusters",
      ylab="Within groups sum of squares")
+
 ### from the straight exponential decay of the plot, there are no real
 ### jumps, and no leveling off in the plot.  A good choice of cluster
 ### then, is very subjective.  I choose 12, as it is a convenient number for
@@ -101,7 +113,7 @@ plot(1:50, wss, type="b", xlab="Number of Clusters",
 set.seed(12)
 
 ### run k-means w ith k = 12 on the standardized data
-k12_clust <- kmeans(batting_std, centers = 12, iter.max = 50)
+k12_clust <- kmeans(batting_std, centers = 12, iter.max = 30)
 
 ### add the cluster assignments for each batter-season to the batting dataframe
 batting$cluster_assn <- k12_clust$cluster
@@ -128,6 +140,7 @@ by_decade_sum <- batting %>% group_by(cluster_assn) %>% mutate(play_per_clust = 
                                                or = (n/ppd)/(n/ppc))
 
 
+### Plot Each Cluster's % of Players in League by Half Decade
 
 ggplot(by_decade_sum,aes(x=halfdecade, y = dr)) + 
   labs(x="Half Decade",y="% of League") +
@@ -136,13 +149,39 @@ ggplot(by_decade_sum,aes(x=halfdecade, y = dr)) +
   geom_bar(stat = 'identity', fill ='#356598') +
   theme_light()
 
-ggplot(by_decade_sum, aes(cluster_assn, halfdecade)) + geom_tile(aes(fill = dr),
-                                       colour = "white") + scale_fill_gradient(low = "white",
-                                                                             high = "steelblue")
-
-for (i in sort(unique(batting$halfdecade))) {
-  print(i)
-  print(head((batting %>% filter(cluster_assn == 12, halfdecade == i) %>% arrange(halfdecade,clust_dist,yearID)), 5))
+### Save Each Cluster's Bar Chart Individually
+for (i in 1:12){
+  
+  temp_plot <- ggplot(subset(by_decade_sum, cluster_assn == i),aes(x=halfdecade, y = dr)) + 
+    labs(x="Half Decade",y="% of League") +
+    ggtitle(paste0("% of League in Cluster ", i)) +
+    geom_bar(stat = 'identity', fill ='#356598') +
+    theme_light()
+  
+  ggsave(temp_plot, file=paste0("pct_league_in_cluster_", i,".png"))
+  
 }
 
-cntrs <- k12_clust$centers
+### heatmap of same data
+ggplot(by_decade_sum, aes(cluster_assn, halfdecade)) + geom_tile(aes(fill = dr),
+                                       colour = "white") + 
+  scale_fill_gradient(low = "white",
+                      high = "steelblue")
+
+
+### get top 5 representative batter-seasons in dataframe in 2018 and overall
+
+rep_players_out <- data.frame()
+for (i in 1:12) {
+rep_players_out <- rbind(rep_players_out,
+                         c(clusterid = paste("Cluster ", i)),
+                         head(batting %>% filter(cluster_assn == i) %>% arrange(clust_dist), 5),
+                  head(batting %>% filter(cluster_assn == i, yearID == 2018) %>% arrange(clust_dist), 5))
+}
+
+### unscale centers
+unscaled_centers <- data.frame(unscale(k12_clust$centers, batting_std))
+
+### write representative and centers data to file
+write.csv(rep_players_out, "representative_players_per_cluster.csv",row.names = FALSE)
+write.csv(unscaled_centers, "cluster_center_statistics.csv")
