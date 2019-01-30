@@ -200,31 +200,33 @@ rep_players_out <- rbind(rep_players_out,
                   head(batting %>% filter(cluster_assn == i, yearID == 2018) %>% arrange(clust_dist), 5))
 }
 
+### write representative and centers data to file
+write.csv(rep_players_out, "representative_players_per_cluster.csv",row.names = FALSE)
+write.csv(unscaled_centers, "cluster_center_statistics.csv")
+
+
+############## code not used for article ########################################
 ### unscale centers
-unscaled_centers <- data.frame(unscale(k12_clust$centers, batting_std))
+#unscaled_centers <- data.frame(unscale(k12_clust$centers, batting_std))
 
 
 ### create cluster transition networks
 
-batting$age <- batting$yearID - batting$birthYear
+#batting$age <- batting$yearID - batting$birthYear
 
-batting <- batting %>% arrange(playerID, yearID) %>% group_by(playerID) %>% mutate(next_ops = lead(OPS),
-                                                                                   prev_ops = lag(OPS),
-                                                                                   next_clust = lead(cluster_assn),
-                                                                                   prev_clust = lag(cluster_assn))
+#batting <- batting %>% arrange(playerID, yearID) %>% group_by(playerID) %>% mutate(next_ops = lead(OPS),
+#                                                                                   prev_ops = lag(OPS),
+#                                                                                   next_clust = lead(cluster_assn),
+#                                                                                   prev_clust = lag(cluster_assn))
 
-batting %>% filter(age <= 30) %>% 
-  mutate(ops_pct_delta = (next_ops - prev_ops) / prev_ops) %>% 
-  na.omit() %>%
-  group_by(cluster_assn) %>% 
-  summarize(mean(ops_pct_delta), var(ops_pct_delta))
+#batting %>% filter(age <= 30) %>% 
+#  mutate(ops_pct_delta = (next_ops - prev_ops) / prev_ops) %>% 
+#  na.omit() %>%
+#  group_by(cluster_assn) %>% 
+#  summarize(mean(ops_pct_delta), var(ops_pct_delta))
 
-batting <- batting %>% filter(age <= 30) %>% 
-  mutate(ops_pct_delta = (next_ops - prev_ops) / prev_ops)
+#batting <- batting %>% filter(age <= 30) %>% 
+#  mutate(ops_pct_delta = (next_ops - prev_ops) / prev_ops)
 
-m<- subset(batting, cluster_assn %in% c(2, 12)) %>% na.omit()
-ggplot(m, aes(x=ops_pct_delta, fill=factor(cluster_assn))) + geom_histogram(alpha = 0.5)
-
-### write representative and centers data to file
-write.csv(rep_players_out, "representative_players_per_cluster.csv",row.names = FALSE)
-write.csv(unscaled_centers, "cluster_center_statistics.csv")
+#m <- subset(batting, cluster_assn %in% c(2, 12)) %>% na.omit()
+#ggplot(m, aes(x=ops_pct_delta, fill=factor(cluster_assn))) + geom_histogram(alpha = 0.5)

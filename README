@@ -1,0 +1,14 @@
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Here's a rundown of the important files in this repo
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- playerTypeCluster.R is the code to run the analysis
+- batting.csv and master.csv is the lahman data needed for the analysis
+- cluster_center_statistics.xlsx and the eponymous .csv file contain the mean statistics for each cluster
+- representative_players_per_cluster.xlsx and the eponymous .csv file contain representative player seasons for each cluster
+
+All images are just plots generated from the code.
+
+Happy coding!
+
+Noah
