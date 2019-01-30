@@ -32,7 +32,7 @@ Batting <- read.csv("batting.csv", stringsAsFactors = FALSE)
 Master <- read.csv("master.csv", stringsAsFactors = FALSE)
 
 ### get columns of master needed for the analysis
-master <- Master[c(1,14,15)]
+master <- Master[c(1,2,14,15)]
 
 ### getall hitter seasons from 1955 onward
 batting <- subset(Batting, yearID >= 1955)
@@ -95,7 +95,7 @@ batting$name <- paste(batting$nameFirst, batting$nameLast, sep = " ")
 
 ### selecting only rate statistics, standardize the data.  This
 ### puts each variable on the same scale, helping the k-means algorithm.
-batting_std <- scale(batting[25:44])
+batting_std <- scale(batting[26:45])
 
 ### plot the within sum of squares for possible clusterings from k=2 to k=50
 wss <- (nrow(batting_std)-1)*sum(apply(batting_std,2,var))
@@ -149,6 +149,28 @@ ggplot(by_decade_sum,aes(x=halfdecade, y = dr)) +
   geom_bar(stat = 'identity', fill ='#356598') +
   theme_light()
 
+### Plot subsets of the previous plot
+ggplot(subset(by_decade_sum, cluster_assn %in% c(8,10,11)),aes(x=halfdecade, y = dr)) + 
+  labs(x="Half Decade",y="% of League") +
+  ggtitle("% of League in Each Cluster, by Half Decade") +
+  facet_wrap(~cluster_assn) +
+  geom_bar(stat = 'identity', fill ='#356598') +
+  theme_light()
+
+ggplot(subset(by_decade_sum, cluster_assn %in% c(5,6,12)),aes(x=halfdecade, y = dr)) + 
+  labs(x="Half Decade",y="% of League") +
+  ggtitle("% of League in Each Cluster, by Half Decade") +
+  facet_wrap(~cluster_assn) +
+  geom_bar(stat = 'identity', fill ='#356598') +
+  theme_light()
+
+ggplot(subset(by_decade_sum, cluster_assn %in% c(2,3,7)),aes(x=halfdecade, y = dr)) + 
+  labs(x="Half Decade",y="% of League") +
+  ggtitle("% of League in Each Cluster, by Half Decade") +
+  facet_wrap(~cluster_assn) +
+  geom_bar(stat = 'identity', fill ='#356598') +
+  theme_light()
+
 ### Save Each Cluster's Bar Chart Individually
 for (i in 1:12){
   
@@ -170,7 +192,6 @@ ggplot(by_decade_sum, aes(cluster_assn, halfdecade)) + geom_tile(aes(fill = dr),
 
 
 ### get top 5 representative batter-seasons in dataframe in 2018 and overall
-
 rep_players_out <- data.frame()
 for (i in 1:12) {
 rep_players_out <- rbind(rep_players_out,
@@ -181,6 +202,28 @@ rep_players_out <- rbind(rep_players_out,
 
 ### unscale centers
 unscaled_centers <- data.frame(unscale(k12_clust$centers, batting_std))
+
+
+### create cluster transition networks
+
+batting$age <- batting$yearID - batting$birthYear
+
+batting <- batting %>% arrange(playerID, yearID) %>% group_by(playerID) %>% mutate(next_ops = lead(OPS),
+                                                                                   prev_ops = lag(OPS),
+                                                                                   next_clust = lead(cluster_assn),
+                                                                                   prev_clust = lag(cluster_assn))
+
+batting %>% filter(age <= 30) %>% 
+  mutate(ops_pct_delta = (next_ops - prev_ops) / prev_ops) %>% 
+  na.omit() %>%
+  group_by(cluster_assn) %>% 
+  summarize(mean(ops_pct_delta), var(ops_pct_delta))
+
+batting <- batting %>% filter(age <= 30) %>% 
+  mutate(ops_pct_delta = (next_ops - prev_ops) / prev_ops)
+
+m<- subset(batting, cluster_assn %in% c(2, 12)) %>% na.omit()
+ggplot(m, aes(x=ops_pct_delta, fill=factor(cluster_assn))) + geom_histogram(alpha = 0.5)
 
 ### write representative and centers data to file
 write.csv(rep_players_out, "representative_players_per_cluster.csv",row.names = FALSE)
